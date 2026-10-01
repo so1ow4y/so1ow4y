@@ -1,11 +1,15 @@
 name: Generate Snake Animation
 
-# Змейка собирается раз в сутки и публикуется в отдельную ветку `output`.
-# Ветку main workflow больше не трогает: никаких force-push и удаления истории.
+# Змейка лежит прямо в репозитории (assets/dist), как в старой версии.
+# Обновляется при каждом твоём пуше и раз в неделю.
+# История репозитория не стирается: обычный коммит, без force-push.
 
 on:
+  push:
+    branches: [ main ]
+    paths-ignore: [ "assets/dist/**" ]
   schedule:
-    - cron: "0 0 * * *"
+    - cron: "0 0 * * 1"
   workflow_dispatch:
 
 permissions:
@@ -14,21 +18,27 @@ permissions:
 jobs:
   generate:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
-      - name: Generate snake SVGs
-        uses: Platane/snk/svg-only@v3
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Generate GitHub Contribution Grid Snake
+        uses: Platane/snk@v3
         with:
           github_user_name: ${{ github.repository_owner }}
           outputs: |
-            dist/github-snake.svg?color_snake=red
-            dist/github-snake-dark.svg?palette=github-dark&color_snake=red
+            assets/dist/github-contribution-grid-snake-dark.svg?palette=github-dark&color_snake=#c4b5fd&color_dots=#161b22,#2e1f4d,#4c2f80,#7048b6,#a78bfa
 
-      - name: Push to output branch
-        uses: crazy-max/ghaction-github-pages@v4
-        with:
-          target_branch: output
-          build_dir: dist
-          jekyll: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Commit snake if it changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/dist
+          if git diff --cached --quiet; then
+            echo "No changes"
+            exit 0
+          fi
+          git commit -m "Update snake animation"
+          git pull --rebase origin main
+          git push origin HEAD:main
